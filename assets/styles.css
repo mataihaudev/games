@@ -588,8 +588,8 @@ body::before {
 
 .multiplayer-shell {
   display: grid;
-  gap: 18px;
-  padding-top: 22px;
+  gap: 12px;
+  padding-top: 16px;
 }
 
 .multiplayer-frame {
@@ -844,6 +844,10 @@ body::before {
   color: white;
 }
 
+.category-field {
+  min-width: 0;
+}
+
 .sidebar-card {
   align-self: start;
 }
@@ -908,6 +912,17 @@ body::before {
 .duplicate-answer {
   border-color: rgba(255, 200, 87, 0.42);
   background: rgba(255, 249, 233, 0.9);
+}
+
+.secret-answer {
+  border-color: rgba(22, 150, 164, 0.24);
+  background: linear-gradient(145deg, rgba(232, 252, 249, 0.92), rgba(255, 255, 255, 0.9));
+}
+
+.masked-validation-answer {
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--lagoon-deep);
 }
 
 .score-picker {
@@ -1014,6 +1029,23 @@ body::before {
   background: linear-gradient(145deg, rgba(255, 248, 233, 0.82), rgba(255, 255, 255, 0.76));
 }
 
+.surprise-stage {
+  display: grid;
+  gap: 12px;
+  padding: 20px;
+  border-radius: 22px;
+  background: linear-gradient(145deg, rgba(255, 250, 240, 0.96), rgba(255, 255, 255, 0.88));
+  border: 1px solid rgba(255, 255, 255, 0.65);
+}
+
+.surprise-stage h2 {
+  margin: 0;
+}
+
+.surprise-stage-open {
+  background: linear-gradient(145deg, rgba(255, 244, 220, 0.96), rgba(255, 252, 243, 0.9));
+}
+
 @media (min-width: 720px) {
   .shell {
     padding: 32px 28px 70px;
@@ -1071,5 +1103,33 @@ body::before {
     scroll-behavior: auto !important;
     animation: none !important;
     transition: none !important;
+  }
+}
+
+@media (max-width: 719px) {
+  .multiplayer-frame {
+    padding: 10px;
+    border-radius: 24px;
+    min-height: 0;
+  }
+
+  .room-card {
+    padding: 18px;
+    border-radius: 20px;
+  }
+
+  .round-header {
+    gap: 10px;
+    align-items: center;
+  }
+
+  .round-header h2 {
+    font-size: 1.8rem;
+  }
+
+  .timer-chip {
+    min-width: 70px;
+    min-height: 40px;
+    padding: 0 12px;
   }
 }

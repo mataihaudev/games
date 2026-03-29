@@ -13,6 +13,7 @@
     playerId: null,
     playerName: "",
     setupError: "",
+    finalRevealOpen: false,
     unsubscribe: null,
     countdownId: null,
     countdownRemaining: null,
@@ -177,10 +178,32 @@
     }
   }
 
+  function updateTimerChip() {
+    const timerChip = root.querySelector("[data-timer-chip]");
+    if (!timerChip) {
+      return;
+    }
+
+    if (state.countdownRemaining !== null) {
+      timerChip.textContent = state.countdownRemaining + "s";
+      timerChip.classList.add("timer-live");
+      return;
+    }
+
+    timerChip.textContent = "En cours";
+    timerChip.classList.remove("timer-live");
+  }
+
+  function isEditingAnswer() {
+    const activeElement = document.activeElement;
+    return Boolean(activeElement && root.contains(activeElement) && activeElement.hasAttribute("data-category-index"));
+  }
+
   function syncCountdown() {
     stopLocalCountdown();
     if (!state.room || !state.room.timer || !state.room.timer.endsAt) {
       state.countdownRemaining = null;
+      updateTimerChip();
       return;
     }
 
@@ -190,19 +213,29 @@
       if (remaining <= 0) {
         stopLocalCountdown();
       }
-      render();
+      updateTimerChip();
     };
 
     tick();
     state.countdownId = window.setInterval(tick, 500);
   }
 
-  async function refreshRoom() {
+  async function refreshRoom(options) {
     if (!state.roomId) {
       return;
     }
-    state.room = await backend.getRoom(state.roomId);
+
+    const nextRoom = await backend.getRoom(state.roomId);
+    const preserveInput = Boolean(options && options.preserveInput);
+    const shouldPreserveInput = preserveInput && isEditingAnswer() && state.room && state.room.stage === "playing" && nextRoom.stage === "playing";
+
+    state.room = nextRoom;
     syncCountdown();
+
+    if (shouldPreserveInput) {
+      return;
+    }
+
     render();
   }
 
@@ -215,7 +248,7 @@
       if (!state.roomId || (changedRoomId && changedRoomId !== state.roomId)) {
         return;
       }
-      refreshRoom();
+      refreshRoom({ preserveInput: true });
     });
   }
 
@@ -255,6 +288,7 @@
       room.submissions = {};
       room.scoreEntries = {};
     });
+    state.finalRevealOpen = false;
     refreshRoom();
   }
 
@@ -347,6 +381,7 @@
       room.finisherId = null;
       room.revealState = { showHostFinal: false };
     });
+    state.finalRevealOpen = false;
     refreshRoom();
   }
 
@@ -474,29 +509,24 @@
     const roundAnswers = playerAnswers(round.roundNumber, state.playerId);
     const finisher = playerForId(state.room.finisherId);
     const categoriesMarkup = round.categories.map(function mapCategory(category, index) {
-      const isFinalAnnouncementSlot = round.roundNumber === 3 && index === 9;
       const value = escapeHtml(roundAnswers.answers[String(index)] || "");
-      const placeholder = isFinalAnnouncementSlot
-        ? escapeHtml(data.finalRound.inputHint)
-        : `${escapeHtml(round.letter)}...`;
       return `
         <label class="field-block category-field">
           <span>${index + 1}. ${escapeHtml(category)}</span>
-          <input class="text-input" data-category-index="${index}" maxlength="40" value="${value}" placeholder="${placeholder}">
-          ${isFinalAnnouncementSlot ? `<small class="field-help">${escapeHtml(data.finalRound.inputHint)}</small>` : ""}
+          <input class="text-input" data-category-index="${index}" maxlength="40" value="${value}" placeholder="${escapeHtml(round.letter)}...">
         </label>
       `;
     }).join("");
 
     root.innerHTML = `
-      <section class="room-grid">
+      <section>
         <article class="room-card round-card">
           <div class="round-header">
             <div>
               <p class="eyebrow">Manche ${round.roundNumber}</p>
               <h2>Lettre ${escapeHtml(round.letter)}</h2>
             </div>
-            <div class="timer-chip ${state.countdownRemaining !== null ? "timer-live" : ""}">
+            <div class="timer-chip ${state.countdownRemaining !== null ? "timer-live" : ""}" data-timer-chip>
               ${state.countdownRemaining !== null ? `${state.countdownRemaining}s` : "En cours"}
             </div>
           </div>
@@ -506,15 +536,6 @@
             ${isHost() ? '<button class="primary-button" type="button" id="force-validation">Ouvrir la validation</button>' : ''}
           </div>
           ${finisher ? `<p class="inline-fact show-fact">${escapeHtml(finisher.name)} a termine. Le chrono final est lance pour tout le salon.</p>` : ""}
-        </article>
-        <article class="room-card sidebar-card">
-          <p class="eyebrow">Saisie</p>
-          <ul class="round-list">
-            ${round.categories.map(function mapList(category, index) {
-              const answer = roundAnswers.answers[String(index)] || "";
-              return `<li><strong>${index + 1}.</strong> ${escapeHtml(category)} <span>${escapeHtml(answer || "-")}</span></li>`;
-            }).join("")}
-          </ul>
         </article>
       </section>
     `;
@@ -539,21 +560,28 @@
     const categoryName = round.categories[categoryIndex];
     const duplicates = duplicateInfo(round.roundNumber, categoryIndex);
     const existingScores = scoreEntries(round.roundNumber, categoryIndex);
+    const isFinalRevealCategory = round.roundNumber === state.room.rounds.length && categoryIndex === round.categories.length - 1;
 
     const cardsMarkup = state.room.players.map(function mapPlayer(player) {
       const answer = duplicates.values[player.id] || "";
       const normalized = answer.trim().toLowerCase();
-      const duplicateClass = normalized && duplicates.duplicates.has(normalized) ? "duplicate-answer" : "unique-answer";
+      const duplicateClass = isFinalRevealCategory
+        ? "secret-answer"
+        : normalized && duplicates.duplicates.has(normalized) ? "duplicate-answer" : "unique-answer";
       const finisherPenaltyHint = state.room.finisherId === player.id ? "A coupe le chrono" : "";
       const currentScore = Number(existingScores[player.id] || 0);
+      const statusLabel = isFinalRevealCategory
+        ? "Carte finale scellee"
+        : duplicateClass === "duplicate-answer" ? "Reponse partagee" : "Reponse originale";
+      const answerMarkup = isFinalRevealCategory ? "Mot final masque" : escapeHtml(answer || "-");
 
       return `
         <article class="validation-card ${duplicateClass}" data-player-id="${player.id}">
           <header>
             <strong>${escapeHtml(player.name)}</strong>
-            <span>${duplicateClass === "duplicate-answer" ? "Reponse partagee" : "Reponse originale"}</span>
+            <span>${escapeHtml(statusLabel)}</span>
           </header>
-          <p class="validation-answer">${escapeHtml(answer || "-")}</p>
+          <p class="validation-answer ${isFinalRevealCategory ? "masked-validation-answer" : ""}">${answerMarkup}</p>
           <small>${escapeHtml(finisherPenaltyHint)}</small>
           ${isHost() ? `
             <div class="score-picker">
@@ -575,7 +603,7 @@
           </div>
           <div class="timer-chip">Manche ${round.roundNumber}</div>
         </div>
-        <p class="panel-copy">Attribuez les points categorie par categorie. Les reponses proches ressortent tout de suite pour accelerer l'arbitrage.</p>
+        <p class="panel-copy">${isFinalRevealCategory ? "La derniere carte reste volontairement masquee jusqu'a l'annonce finale." : "Attribuez les points categorie par categorie. Les reponses proches ressortent tout de suite pour accelerer l'arbitrage."}</p>
         <div class="validation-grid">${cardsMarkup}</div>
         <div class="action-row room-actions">
           ${isHost() ? '<button class="primary-button" type="button" id="save-category">Valider la categorie</button>' : '<div class="note-panel"><p>En attente de la validation de l\'hote.</p></div>'}
@@ -659,16 +687,17 @@
       <section class="room-grid">
         <article class="room-card final-room-card">
           <p class="eyebrow">Annonce</p>
-          <h2>${escapeHtml(data.finalRound.announcementTitle)}</h2>
-          <p class="panel-copy">La derniere categorie et la lettre B menaient simplement a cette reponse finale.</p>
-          <div class="host-reveal-panel ${state.room.revealState && state.room.revealState.showHostFinal ? "visible-reveal" : ""}">
+          <div class="surprise-stage ${state.finalRevealOpen ? "surprise-stage-open" : ""}">
+            <span class="reveal-label">Derniere carte</span>
+            <h2>${state.finalRevealOpen ? escapeHtml(data.finalRound.announcementTitle) : "Tout tenait dans un dernier mot en B..."}</h2>
+            <p class="panel-copy">${state.finalRevealOpen ? escapeHtml(data.finalRound.announcementCopy) : `Gardez le suspense encore une seconde, puis ouvrez la derniere carte pour decouvrir l'annonce finale.`}</p>
+            ${state.finalRevealOpen ? "" : '<button class="primary-button" type="button" id="reveal-announcement">Decouvrir l\'annonce</button>'}
+          </div>
+          <div class="host-reveal-panel ${state.finalRevealOpen ? "visible-reveal" : ""}">
             <span class="reveal-label">${escapeHtml(categoryName)}</span>
             <strong>${escapeHtml(hostAnswer || data.finalRound.suggestedAnswer)}</strong>
           </div>
-          <p class="result-highlight">${escapeHtml(data.finalRound.announcementCopy)}</p>
-          <div class="final-answer-grid">
-            ${finalAnswersMarkup}
-          </div>
+          ${state.finalRevealOpen ? `<div class="final-answer-grid">${finalAnswersMarkup}</div>` : ""}
         </article>
         <article class="room-card summary-card">
           <p class="eyebrow">Classement</p>
@@ -676,6 +705,14 @@
         </article>
       </section>
     `;
+
+    const revealButton = root.querySelector("#reveal-announcement");
+    if (revealButton) {
+      revealButton.addEventListener("click", function handleReveal() {
+        state.finalRevealOpen = true;
+        renderFinished();
+      });
+    }
   }
 
   function render() {
