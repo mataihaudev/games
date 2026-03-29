@@ -1,0 +1,50 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Petit Bac Family</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Baloo+2:wght@400;600;700&family=Manrope:wght@400;500;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="assets/styles.css">
+</head>
+<body data-page="multiplayer">
+  <main class="shell multiplayer-shell">
+    <a class="back-link" href="index.html">Retour</a>
+    <section class="hero-card room-hero">
+      <p class="eyebrow">Jeu en famille</p>
+      <h1>Petit Bac Live</h1>
+      <p class="hero-copy">Creez un salon prive, partagez le lien et lancez de nouvelles manches avec toute la famille.</p>
+      <div class="hero-pill-row" aria-label="Points forts du jeu">
+        <span class="hero-pill">Salons prives</span>
+        <span class="hero-pill">Invitation par lien</span>
+        <span class="hero-pill">Validation en direct</span>
+      </div>
+      <div class="hero-stat-grid" aria-label="Fonctionnalites principales">
+        <article class="hero-stat">
+          <strong>Rapide a lancer</strong>
+          <span>Un pseudo, un lien, et tout le monde rejoint la meme table.</span>
+        </article>
+        <article class="hero-stat">
+          <strong>Fait pour jouer ensemble</strong>
+          <span>Les reponses arrivent en meme temps et l'hote arbitre en quelques clics.</span>
+        </article>
+        <article class="hero-stat">
+          <strong>Relances immediates</strong>
+          <span>Le salon reste pret pour enchainer une nouvelle manche quand vous voulez.</span>
+        </article>
+      </div>
+    </section>
+    <section class="quiz-frame multiplayer-frame">
+      <div id="multiplayer-root"></div>
+    </section>
+  </main>
+
+  <script src="assets/multiplayer/data.js"></script>
+  <script src="assets/multiplayer/config.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script src="assets/multiplayer/supabase.js"></script>
+  <script src="assets/multiplayer/game.js"></script>
+</body>
+</html>

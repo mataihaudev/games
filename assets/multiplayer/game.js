@@ -1,0 +1,684 @@
+(function () {
+  const root = document.getElementById("multiplayer-root");
+  const data = window.wordGameData;
+  let backend = null;
+
+  if (!root || !data) {
+    return;
+  }
+
+  const state = {
+    room: null,
+    roomId: null,
+    playerId: null,
+    playerName: "",
+    unsubscribe: null,
+    countdownId: null,
+    countdownRemaining: null,
+    lastRevealTimeout: null
+  };
+
+  function escapeHtml(value) {
+    return String(value)
+      .replace(/&/g, "&amp;")
+      .replace(/</g, "&lt;")
+      .replace(/>/g, "&gt;")
+      .replace(/\"/g, "&quot;")
+      .replace(/'/g, "&#039;");
+  }
+
+  function getQuery() {
+    return new URLSearchParams(window.location.search);
+  }
+
+  function persistIdentity() {
+    try {
+      window.sessionStorage.setItem("scatter-room-id", state.roomId || "");
+      window.sessionStorage.setItem("scatter-player-id", state.playerId || "");
+      window.sessionStorage.setItem("scatter-player-name", state.playerName || "");
+    } catch (error) {
+      // Ignore persistence issues.
+    }
+  }
+
+  function restoreIdentity() {
+    const query = getQuery();
+    try {
+      state.roomId = query.get("room") || window.sessionStorage.getItem("scatter-room-id") || "";
+      state.playerId = query.get("player") || window.sessionStorage.getItem("scatter-player-id") || "";
+      state.playerName = query.get("name") || window.sessionStorage.getItem("scatter-player-name") || "";
+    } catch (error) {
+      state.roomId = query.get("room") || "";
+      state.playerId = query.get("player") || "";
+      state.playerName = query.get("name") || "";
+    }
+  }
+
+  function playerForId(playerId) {
+    return state.room ? state.room.players.find((player) => player.id === playerId) : null;
+  }
+
+  function getCurrentPlayer() {
+    return playerForId(state.playerId);
+  }
+
+  function isHost() {
+    const player = getCurrentPlayer();
+    return Boolean(player && player.isHost);
+  }
+
+  function roomLink() {
+    const url = new URL(window.location.href);
+    url.search = "";
+    url.searchParams.set("room", state.roomId || "");
+    return url.toString();
+  }
+
+  function roundAt(index) {
+    return state.room && state.room.rounds ? state.room.rounds[index] : null;
+  }
+
+  function currentRound() {
+    return roundAt(state.room.currentRoundIndex || 0);
+  }
+
+  function roomSubmissionKey(roundNumber) {
+    return String(roundNumber);
+  }
+
+  function playerAnswers(roundNumber, playerId) {
+    const roundSubmissions = (state.room.submissions || {})[roomSubmissionKey(roundNumber)] || {};
+    return roundSubmissions[playerId] || { answers: {}, finishedAt: null };
+  }
+
+  function scoreEntries(roundNumber, categoryIndex) {
+    const roundEntries = (state.room.scoreEntries || {})[roomSubmissionKey(roundNumber)] || {};
+    return roundEntries[String(categoryIndex)] || {};
+  }
+
+  function duplicateInfo(roundNumber, categoryIndex) {
+    const round = roundAt(roundNumber - 1);
+    if (!round) {
+      return { values: {}, duplicates: new Set() };
+    }
+
+    const answersByPlayer = {};
+    const normalizedCounts = {};
+
+    state.room.players.forEach((player) => {
+      const entry = playerAnswers(roundNumber, player.id);
+      const answer = (entry.answers[String(categoryIndex)] || "").trim();
+      answersByPlayer[player.id] = answer;
+      if (answer) {
+        const normalized = answer.toLowerCase();
+        normalizedCounts[normalized] = (normalizedCounts[normalized] || 0) + 1;
+      }
+    });
+
+    const duplicates = new Set(
+      Object.keys(normalizedCounts).filter((value) => normalizedCounts[value] > 1)
+    );
+
+    return { values: answersByPlayer, duplicates };
+  }
+
+  function stopLocalCountdown() {
+    if (state.countdownId) {
+      window.clearInterval(state.countdownId);
+      state.countdownId = null;
+    }
+  }
+
+  function syncCountdown() {
+    stopLocalCountdown();
+    if (!state.room || !state.room.timer || !state.room.timer.endsAt) {
+      state.countdownRemaining = null;
+      return;
+    }
+
+    const tick = function tick() {
+      const remaining = Math.max(0, Math.ceil((state.room.timer.endsAt - Date.now()) / 1000));
+      state.countdownRemaining = remaining;
+      if (remaining <= 0) {
+        stopLocalCountdown();
+      }
+      render();
+    };
+
+    tick();
+    state.countdownId = window.setInterval(tick, 500);
+  }
+
+  async function refreshRoom() {
+    if (!state.roomId) {
+      return;
+    }
+    state.room = await backend.getRoom(state.roomId);
+    syncCountdown();
+    render();
+  }
+
+  function subscribeToRoom() {
+    if (state.unsubscribe) {
+      state.unsubscribe();
+    }
+
+    state.unsubscribe = backend.subscribe(function handleSync(_, changedRoomId) {
+      if (!state.roomId || (changedRoomId && changedRoomId !== state.roomId)) {
+        return;
+      }
+      refreshRoom();
+    });
+  }
+
+  async function createRoom(playerName) {
+    const result = await backend.createRoom(playerName);
+    state.roomId = result.roomId;
+    state.playerId = result.playerId;
+    state.playerName = playerName;
+    state.room = result.room;
+    persistIdentity();
+    subscribeToRoom();
+    window.history.replaceState({}, "", `multiplayer.html?room=${state.roomId}&player=${state.playerId}&name=${encodeURIComponent(playerName)}`);
+    render();
+  }
+
+  async function joinRoom(roomId, playerName) {
+    const result = await backend.joinRoom(roomId, playerName);
+    state.roomId = result.roomId;
+    state.playerId = result.playerId;
+    state.playerName = playerName;
+    state.room = result.room;
+    persistIdentity();
+    subscribeToRoom();
+    window.history.replaceState({}, "", `multiplayer.html?room=${state.roomId}&player=${state.playerId}&name=${encodeURIComponent(playerName)}`);
+    render();
+  }
+
+  async function startGame() {
+    await backend.updateRoom(state.roomId, function update(room) {
+      room.stage = "playing";
+      room.currentRoundIndex = 0;
+      room.currentValidationCategoryIndex = 0;
+      room.timer = null;
+      room.finisherId = null;
+      room.revealState = { showHostFinal: false };
+      room.rounds = data.generateRounds();
+      room.submissions = {};
+      room.scoreEntries = {};
+    });
+    refreshRoom();
+  }
+
+  async function saveAnswer(roundNumber, categoryIndex, value) {
+    await backend.updateRoom(state.roomId, function update(room) {
+      const roundKey = roomSubmissionKey(roundNumber);
+      room.submissions[roundKey] = room.submissions[roundKey] || {};
+      room.submissions[roundKey][state.playerId] = room.submissions[roundKey][state.playerId] || { answers: {}, finishedAt: null };
+      room.submissions[roundKey][state.playerId].answers[String(categoryIndex)] = value;
+    });
+  }
+
+  async function finishRound() {
+    const round = currentRound();
+    if (!round) {
+      return;
+    }
+
+    await backend.updateRoom(state.roomId, function update(room) {
+      const roundNumber = round.roundNumber;
+      const roundKey = roomSubmissionKey(roundNumber);
+      room.submissions[roundKey] = room.submissions[roundKey] || {};
+      room.submissions[roundKey][state.playerId] = room.submissions[roundKey][state.playerId] || { answers: {}, finishedAt: null };
+      room.submissions[roundKey][state.playerId].finishedAt = Date.now();
+
+      if (!room.timer) {
+        room.finisherId = state.playerId;
+        room.timer = {
+          startedAt: Date.now(),
+          endsAt: Date.now() + 10000
+        };
+      }
+    });
+
+    refreshRoom();
+  }
+
+  async function forceValidation() {
+    await backend.updateRoom(state.roomId, function update(room) {
+      room.stage = "validation";
+      room.currentValidationCategoryIndex = 0;
+      room.timer = null;
+    });
+    refreshRoom();
+  }
+
+  async function applyCategoryScores(scoresByPlayer) {
+    const round = currentRound();
+    const categoryIndex = state.room.currentValidationCategoryIndex;
+    await backend.updateRoom(state.roomId, function update(room) {
+      const roundKey = roomSubmissionKey(round.roundNumber);
+      room.scoreEntries[roundKey] = room.scoreEntries[roundKey] || {};
+      room.scoreEntries[roundKey][String(categoryIndex)] = scoresByPlayer;
+
+      room.players.forEach(function updatePlayer(player) {
+        const previousRoundEntries = room.scoreEntries[roundKey];
+        let total = 0;
+        Object.keys(previousRoundEntries).forEach(function sumCategory(key) {
+          total += Number(previousRoundEntries[key][player.id] || 0);
+        });
+        const earlierRounds = Object.keys(room.scoreEntries).filter((key) => key !== roundKey);
+        earlierRounds.forEach(function sumRound(key) {
+          Object.keys(room.scoreEntries[key]).forEach(function sumCategoryScores(categoryKey) {
+            total += Number(room.scoreEntries[key][categoryKey][player.id] || 0);
+          });
+        });
+        player.score = total;
+      });
+
+      if (room.currentValidationCategoryIndex >= round.categories.length - 1) {
+        if (room.currentRoundIndex >= room.rounds.length - 1) {
+          room.stage = "finished";
+          room.revealState = { showHostFinal: true };
+        } else {
+          room.stage = "round-summary";
+        }
+      } else {
+        room.currentValidationCategoryIndex += 1;
+      }
+    });
+    refreshRoom();
+  }
+
+  async function continueAfterSummary() {
+    await backend.updateRoom(state.roomId, function update(room) {
+      room.stage = "playing";
+      room.currentRoundIndex += 1;
+      room.currentValidationCategoryIndex = 0;
+      room.timer = null;
+      room.finisherId = null;
+      room.revealState = { showHostFinal: false };
+    });
+    refreshRoom();
+  }
+
+  function renderSetup() {
+    const noteTitle = backend && backend.mode === "supabase" ? "Salon en ligne" : "Mode local";
+    const noteCopy = backend && backend.mode === "supabase"
+      ? "Invitez vos proches avec le lien ou le code du salon, puis laissez l'hote lancer la prochaine manche au bon moment."
+      : "Le mode multijoueur reste local tant que la configuration Supabase n'est pas active.";
+
+    root.innerHTML = `
+      <section class="room-card">
+        <p class="eyebrow">Salon prive</p>
+        <h2>Creer ou rejoindre un salon</h2>
+        <form id="room-form" class="room-form">
+          <label class="field-block">
+            <span>Pseudo</span>
+            <input class="text-input" name="name" maxlength="24" placeholder="Ex. Mereh" required>
+          </label>
+          <label class="field-block">
+            <span>Code du salon</span>
+            <input class="text-input" name="room" maxlength="6" placeholder="A renseigner pour rejoindre">
+          </label>
+          <div class="action-row room-actions">
+            <button class="primary-button" type="submit" name="intent" value="create">Creer un salon</button>
+            <button class="ghost-button" type="submit" name="intent" value="join">Rejoindre un salon</button>
+          </div>
+        </form>
+        <div class="note-panel">
+          <strong>${escapeHtml(noteTitle)}</strong>
+          <p>${escapeHtml(noteCopy)}</p>
+        </div>
+      </section>
+    `;
+
+    const form = root.querySelector("#room-form");
+    form.addEventListener("submit", async function handleSubmit(event) {
+      event.preventDefault();
+      const submitter = event.submitter;
+      const formData = new FormData(form);
+      const name = String(formData.get("name") || "").trim();
+      const roomId = String(formData.get("room") || "").trim().toUpperCase();
+      const intent = submitter ? submitter.value : "create";
+
+      if (!name) {
+        return;
+      }
+
+      if (intent === "join" && roomId) {
+        await joinRoom(roomId, name);
+        return;
+      }
+
+      await createRoom(name);
+    });
+  }
+
+  function renderLobby() {
+    const playersMarkup = state.room.players.map(function mapPlayer(player) {
+      return `
+        <article class="player-pill ${player.isHost ? "host-pill" : ""}">
+          <strong>${escapeHtml(player.name)}</strong>
+          <span>${player.isHost ? "Hote" : "Joueur"}</span>
+        </article>
+      `;
+    }).join("");
+
+    root.innerHTML = `
+      <section class="room-grid">
+        <article class="room-card">
+          <p class="eyebrow">Salon</p>
+          <h2>${escapeHtml(state.room.id)}</h2>
+          <p class="panel-copy">Partagez ce lien ou le code du salon pour reunir toute la famille dans la meme partie.</p>
+          <label class="field-block">
+            <span>Lien d'invitation</span>
+            <input class="text-input" value="${escapeHtml(roomLink())}" readonly>
+          </label>
+          <div class="action-row room-actions">
+            <button class="ghost-button" type="button" id="copy-link">Copier le lien</button>
+            ${isHost() ? '<button class="primary-button" type="button" id="start-room">Lancer une manche</button>' : ''}
+          </div>
+        </article>
+        <article class="room-card">
+          <p class="eyebrow">Joueurs</p>
+          <div class="player-list">${playersMarkup}</div>
+        </article>
+      </section>
+    `;
+
+    const copyButton = root.querySelector("#copy-link");
+    if (copyButton) {
+      copyButton.addEventListener("click", async function handleCopy() {
+        try {
+          await navigator.clipboard.writeText(roomLink());
+          copyButton.textContent = "Lien copie";
+        } catch (error) {
+          copyButton.textContent = "Copie manuelle";
+        }
+      });
+    }
+
+    const startButton = root.querySelector("#start-room");
+    if (startButton) {
+      startButton.addEventListener("click", startGame);
+    }
+  }
+
+  function renderPlaying() {
+    const round = currentRound();
+    const roundAnswers = playerAnswers(round.roundNumber, state.playerId);
+    const finisher = playerForId(state.room.finisherId);
+    const categoriesMarkup = round.categories.map(function mapCategory(category, index) {
+      const isFinalAnnouncementSlot = round.roundNumber === 3 && index === 9;
+      const value = escapeHtml(roundAnswers.answers[String(index)] || "");
+      const placeholder = isFinalAnnouncementSlot
+        ? escapeHtml(data.finalRound.inputHint)
+        : `${escapeHtml(round.letter)}...`;
+      return `
+        <label class="field-block category-field">
+          <span>${index + 1}. ${escapeHtml(category)}</span>
+          <input class="text-input" data-category-index="${index}" maxlength="40" value="${value}" placeholder="${placeholder}">
+          ${isFinalAnnouncementSlot ? `<small class="field-help">${escapeHtml(data.finalRound.inputHint)}</small>` : ""}
+        </label>
+      `;
+    }).join("");
+
+    root.innerHTML = `
+      <section class="room-grid">
+        <article class="room-card round-card">
+          <div class="round-header">
+            <div>
+              <p class="eyebrow">Manche ${round.roundNumber}</p>
+              <h2>Lettre ${escapeHtml(round.letter)}</h2>
+            </div>
+            <div class="timer-chip ${state.countdownRemaining !== null ? "timer-live" : ""}">
+              ${state.countdownRemaining !== null ? `${state.countdownRemaining}s` : "En cours"}
+            </div>
+          </div>
+          <form id="answers-form" class="category-grid">${categoriesMarkup}</form>
+          <div class="action-row room-actions">
+            <button class="ghost-button" type="button" id="finish-button">Je termine</button>
+            ${isHost() ? '<button class="primary-button" type="button" id="force-validation">Ouvrir la validation</button>' : ''}
+          </div>
+          ${finisher ? `<p class="inline-fact show-fact">${escapeHtml(finisher.name)} a termine. Le chrono final est lance pour tout le salon.</p>` : ""}
+        </article>
+        <article class="room-card sidebar-card">
+          <p class="eyebrow">Saisie</p>
+          <ul class="round-list">
+            ${round.categories.map(function mapList(category, index) {
+              const answer = roundAnswers.answers[String(index)] || "";
+              return `<li><strong>${index + 1}.</strong> ${escapeHtml(category)} <span>${escapeHtml(answer || "-")}</span></li>`;
+            }).join("")}
+          </ul>
+        </article>
+      </section>
+    `;
+
+    root.querySelectorAll("[data-category-index]").forEach(function bindInput(input) {
+      input.addEventListener("change", function handleChange() {
+        saveAnswer(round.roundNumber, Number(input.dataset.categoryIndex), input.value.trim());
+      });
+    });
+
+    root.querySelector("#finish-button").addEventListener("click", finishRound);
+
+    const forceValidationButton = root.querySelector("#force-validation");
+    if (forceValidationButton) {
+      forceValidationButton.addEventListener("click", forceValidation);
+    }
+  }
+
+  function renderValidation() {
+    const round = currentRound();
+    const categoryIndex = state.room.currentValidationCategoryIndex;
+    const categoryName = round.categories[categoryIndex];
+    const duplicates = duplicateInfo(round.roundNumber, categoryIndex);
+    const existingScores = scoreEntries(round.roundNumber, categoryIndex);
+
+    const cardsMarkup = state.room.players.map(function mapPlayer(player) {
+      const answer = duplicates.values[player.id] || "";
+      const normalized = answer.trim().toLowerCase();
+      const duplicateClass = normalized && duplicates.duplicates.has(normalized) ? "duplicate-answer" : "unique-answer";
+      const finisherPenaltyHint = state.room.finisherId === player.id ? "A coupe le chrono" : "";
+      const currentScore = Number(existingScores[player.id] || 0);
+
+      return `
+        <article class="validation-card ${duplicateClass}" data-player-id="${player.id}">
+          <header>
+            <strong>${escapeHtml(player.name)}</strong>
+            <span>${duplicateClass === "duplicate-answer" ? "Reponse partagee" : "Reponse originale"}</span>
+          </header>
+          <p class="validation-answer">${escapeHtml(answer || "-")}</p>
+          <small>${escapeHtml(finisherPenaltyHint)}</small>
+          ${isHost() ? `
+            <div class="score-picker">
+              <button type="button" class="score-button ${currentScore === -1 ? "picked" : ""}" data-score="-1">-1</button>
+              <button type="button" class="score-button ${currentScore === 1 ? "picked" : ""}" data-score="1">+1</button>
+              <button type="button" class="score-button ${currentScore === 2 ? "picked" : ""}" data-score="2">+2</button>
+            </div>
+          ` : ""}
+        </article>
+      `;
+    }).join("");
+
+    root.innerHTML = `
+      <section class="room-card validation-shell">
+        <div class="round-header">
+          <div>
+            <p class="eyebrow">Validation en direct</p>
+            <h2>${categoryIndex + 1}. ${escapeHtml(categoryName)}</h2>
+          </div>
+          <div class="timer-chip">Manche ${round.roundNumber}</div>
+        </div>
+        <p class="panel-copy">Attribuez les points categorie par categorie. Les reponses proches ressortent tout de suite pour accelerer l'arbitrage.</p>
+        <div class="validation-grid">${cardsMarkup}</div>
+        <div class="action-row room-actions">
+          ${isHost() ? '<button class="primary-button" type="button" id="save-category">Valider la categorie</button>' : '<div class="note-panel"><p>En attente de la validation de l\'hote.</p></div>'}
+        </div>
+      </section>
+    `;
+
+    if (!isHost()) {
+      return;
+    }
+
+    const scores = {};
+    state.room.players.forEach(function initPlayer(player) {
+      scores[player.id] = Number(existingScores[player.id] || 0);
+    });
+
+    root.querySelectorAll(".validation-card").forEach(function bindCard(card) {
+      card.querySelectorAll("[data-score]").forEach(function bindButton(button) {
+        button.addEventListener("click", function handleScore() {
+          const playerId = card.dataset.playerId;
+          scores[playerId] = Number(button.dataset.score);
+          card.querySelectorAll(".score-button").forEach(function reset(other) {
+            other.classList.remove("picked");
+          });
+          button.classList.add("picked");
+        });
+      });
+    });
+
+    root.querySelector("#save-category").addEventListener("click", function handleSave() {
+      applyCategoryScores(scores);
+    });
+  }
+
+  function renderSummary() {
+    const playersMarkup = state.room.players
+      .slice()
+      .sort(function sortByScore(left, right) { return right.score - left.score; })
+      .map(function mapPlayer(player) {
+        return `<li><strong>${escapeHtml(player.name)}</strong><span>${player.score} pts</span></li>`;
+      }).join("");
+
+    root.innerHTML = `
+      <section class="room-card summary-card">
+        <p class="eyebrow">Fin de manche</p>
+        <h2>Classement provisoire</h2>
+        <ol class="leaderboard-list">${playersMarkup}</ol>
+        ${isHost() ? '<button class="primary-button" type="button" id="next-round">Lancer la manche suivante</button>' : '<p class="panel-copy">L\'hote prepare la manche suivante.</p>'}
+      </section>
+    `;
+
+    const nextButton = root.querySelector("#next-round");
+    if (nextButton) {
+      nextButton.addEventListener("click", continueAfterSummary);
+    }
+  }
+
+  function renderFinished() {
+    const round = currentRound();
+    const categoryName = round ? round.categories[9] : data.finalRound.finalCategory;
+    const host = playerForId(state.room.hostId);
+    const hostAnswer = host ? (playerAnswers(3, host.id).answers["9"] || data.finalRound.suggestedAnswer) : data.finalRound.suggestedAnswer;
+    const finalAnswersMarkup = state.room.players
+      .map(function mapFinalAnswer(player) {
+        const answer = playerAnswers(3, player.id).answers["9"] || "-";
+        return `
+          <article class="final-answer-card ${player.isHost ? "host-answer-card" : ""}">
+            <span>${escapeHtml(player.name)}</span>
+            <strong>${escapeHtml(answer)}</strong>
+          </article>
+        `;
+      }).join("");
+    const playersMarkup = state.room.players
+      .slice()
+      .sort(function sortByScore(left, right) { return right.score - left.score; })
+      .map(function mapPlayer(player) {
+        return `<li><strong>${escapeHtml(player.name)}</strong><span>${player.score} pts</span></li>`;
+      }).join("");
+
+    root.innerHTML = `
+      <section class="room-grid">
+        <article class="room-card final-room-card">
+          <p class="eyebrow">Annonce</p>
+          <h2>${escapeHtml(data.finalRound.announcementTitle)}</h2>
+          <p class="panel-copy">La derniere categorie et la lettre B menaient simplement a cette reponse finale.</p>
+          <div class="host-reveal-panel ${state.room.revealState && state.room.revealState.showHostFinal ? "visible-reveal" : ""}">
+            <span class="reveal-label">${escapeHtml(categoryName)}</span>
+            <strong>${escapeHtml(hostAnswer || data.finalRound.suggestedAnswer)}</strong>
+          </div>
+          <p class="result-highlight">${escapeHtml(data.finalRound.announcementCopy)}</p>
+          <div class="final-answer-grid">
+            ${finalAnswersMarkup}
+          </div>
+        </article>
+        <article class="room-card summary-card">
+          <p class="eyebrow">Classement</p>
+          <ol class="leaderboard-list">${playersMarkup}</ol>
+        </article>
+      </section>
+    `;
+  }
+
+  function render() {
+    if (!state.room) {
+      renderSetup();
+      return;
+    }
+
+    if (state.room.stage === "lobby") {
+      renderLobby();
+      return;
+    }
+
+    if (state.room.stage === "playing") {
+      renderPlaying();
+      return;
+    }
+
+    if (state.room.stage === "validation") {
+      renderValidation();
+      return;
+    }
+
+    if (state.room.stage === "round-summary") {
+      renderSummary();
+      return;
+    }
+
+    renderFinished();
+  }
+
+  async function bootstrap() {
+    try {
+      await Promise.resolve(window.multiplayerBackendReady);
+    } catch (error) {
+      // Ignore initialization errors and use any available fallback backend.
+    }
+
+    backend = window.multiplayerBackend;
+
+    if (!backend) {
+      root.innerHTML = `
+        <section class="room-card">
+          <p class="eyebrow">Indisponible</p>
+          <h2>Le mode multijoueur ne peut pas demarrer</h2>
+          <p class="panel-copy">La configuration du backend n'a pas pu etre chargee.</p>
+        </section>
+      `;
+      return;
+    }
+
+    restoreIdentity();
+    if (!state.roomId) {
+      renderSetup();
+      return;
+    }
+
+    subscribeToRoom();
+    try {
+      state.room = await backend.getRoom(state.roomId);
+      persistIdentity();
+      render();
+    } catch (error) {
+      state.room = null;
+      renderSetup();
+    }
+  }
+
+  bootstrap();
+})();

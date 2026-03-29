@@ -1,0 +1,58 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Family Game Room</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Baloo+2:wght@400;600;700&family=Manrope:wght@400;500;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="assets/styles.css">
+</head>
+<body class="page-home">
+  <main class="shell home-shell">
+    <section class="hero-card">
+      <p class="eyebrow">Jeux en ligne</p>
+      <h1>Family Game Room</h1>
+      <p class="hero-copy">Deux jeux, des parties qui s'enchainent et des salles privees pour jouer ensemble a distance.</p>
+      <div class="hero-orbs" aria-hidden="true">
+        <span class="orb orb-coral"></span>
+        <span class="orb orb-lagoon"></span>
+        <span class="orb orb-sun"></span>
+      </div>
+    </section>
+
+    <section class="game-showcase" aria-label="Catalogue des jeux">
+      <article class="intro-panel compact-panel game-panel quiz-panel">
+        <div class="game-panel-copy">
+          <p class="eyebrow">Mode solo</p>
+          <h2>Quiz</h2>
+          <p class="panel-copy">Choisis un profil et lance une nouvelle serie de questions a ton rythme.</p>
+        </div>
+        <div class="game-panel-body">
+          <p class="section-label">Profil joueur</p>
+          <div id="avatar-selector" class="avatar-grid"></div>
+          <a class="primary-button start-link disabled-link" id="start-quiz-link" href="quiz.html" aria-disabled="true">Jouer au quiz</a>
+        </div>
+      </article>
+
+      <article class="intro-panel compact-panel game-panel room-panel">
+        <div class="game-panel-copy">
+          <p class="eyebrow">Mode multijoueur</p>
+          <h2>Petit bac</h2>
+          <p class="panel-copy">Cree un salon prive, invite la famille et enchainez les manches avec vos propres reponses.</p>
+        </div>
+        <div class="room-points" aria-label="Atouts du mode petit bac">
+          <span class="room-point">Salles par lien prive</span>
+          <span class="room-point">Validation par l'hote</span>
+          <span class="room-point">Categories originales</span>
+        </div>
+        <a class="ghost-button start-link" href="multiplayer.html">Ouvrir le petit bac</a>
+      </article>
+    </section>
+  </main>
+
+  <script src="assets/quiz-data.js"></script>
+  <script src="assets/home.js"></script>
+</body>
+</html>
