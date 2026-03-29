@@ -42,16 +42,37 @@
     }
   }
 
+  function clearStoredRoomIdentity() {
+    try {
+      window.sessionStorage.removeItem("scatter-room-id");
+      window.sessionStorage.removeItem("scatter-player-id");
+    } catch (error) {
+      // Ignore persistence issues.
+    }
+  }
+
   function restoreIdentity() {
     const query = getQuery();
+    const queryRoomId = query.get("room") || "";
+    const queryPlayerId = query.get("player") || "";
+    const queryPlayerName = query.get("name") || "";
+
     try {
-      state.roomId = query.get("room") || window.sessionStorage.getItem("scatter-room-id") || "";
-      state.playerId = query.get("player") || window.sessionStorage.getItem("scatter-player-id") || "";
-      state.playerName = query.get("name") || window.sessionStorage.getItem("scatter-player-name") || "";
+      if (!queryRoomId) {
+        clearStoredRoomIdentity();
+        state.roomId = "";
+        state.playerId = "";
+        state.playerName = window.sessionStorage.getItem("scatter-player-name") || "";
+        return;
+      }
+
+      state.roomId = queryRoomId;
+      state.playerId = queryPlayerId || window.sessionStorage.getItem("scatter-player-id") || "";
+      state.playerName = queryPlayerName || window.sessionStorage.getItem("scatter-player-name") || "";
     } catch (error) {
-      state.roomId = query.get("room") || "";
-      state.playerId = query.get("player") || "";
-      state.playerName = query.get("name") || "";
+      state.roomId = queryRoomId;
+      state.playerId = queryPlayerId;
+      state.playerName = queryPlayerName;
     }
   }
 
@@ -343,11 +364,11 @@
         <form id="room-form" class="room-form">
           <label class="field-block">
             <span>Pseudo</span>
-            <input class="text-input" name="name" maxlength="24" placeholder="Ex. Mereh" required>
+            <input class="text-input" name="name" maxlength="24" placeholder="Ex. Mereh" value="${escapeHtml(state.playerName || "")}" required>
           </label>
           <label class="field-block">
             <span>Code du salon</span>
-            <input class="text-input" name="room" maxlength="6" placeholder="A renseigner pour rejoindre">
+            <input class="text-input" name="room" maxlength="6" placeholder="A renseigner pour rejoindre" value="${escapeHtml((state.roomId || "").toUpperCase())}">
           </label>
           <div class="action-row room-actions">
             <button class="primary-button" type="submit" name="intent" value="create">Creer un salon</button>
@@ -707,7 +728,8 @@
     }
 
     restoreIdentity();
-    if (!state.roomId) {
+    if (!state.roomId || !state.playerId) {
+      state.room = null;
       renderSetup();
       return;
     }
