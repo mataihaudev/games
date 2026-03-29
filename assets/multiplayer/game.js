@@ -13,7 +13,6 @@
     playerId: null,
     playerName: "",
     setupError: "",
-    finalRevealOpen: false,
     unsubscribe: null,
     countdownId: null,
     countdownRemaining: null,
@@ -288,7 +287,6 @@
       room.submissions = {};
       room.scoreEntries = {};
     });
-    state.finalRevealOpen = false;
     refreshRoom();
   }
 
@@ -381,7 +379,6 @@
       room.finisherId = null;
       room.revealState = { showHostFinal: false };
     });
-    state.finalRevealOpen = false;
     refreshRoom();
   }
 
@@ -565,15 +562,16 @@
     const cardsMarkup = state.room.players.map(function mapPlayer(player) {
       const answer = duplicates.values[player.id] || "";
       const normalized = answer.trim().toLowerCase();
-      const duplicateClass = isFinalRevealCategory
+      const hideHostAnswer = isFinalRevealCategory && player.isHost;
+      const duplicateClass = hideHostAnswer
         ? "secret-answer"
         : normalized && duplicates.duplicates.has(normalized) ? "duplicate-answer" : "unique-answer";
       const finisherPenaltyHint = state.room.finisherId === player.id ? "A coupe le chrono" : "";
       const currentScore = Number(existingScores[player.id] || 0);
-      const statusLabel = isFinalRevealCategory
-        ? "Carte finale scellee"
+      const statusLabel = hideHostAnswer
+        ? "Reponse indisponible"
         : duplicateClass === "duplicate-answer" ? "Reponse partagee" : "Reponse originale";
-      const answerMarkup = isFinalRevealCategory ? "Mot final masque" : escapeHtml(answer || "-");
+      const answerMarkup = hideHostAnswer ? "Synchronisation en attente" : escapeHtml(answer || "-");
 
       return `
         <article class="validation-card ${duplicateClass}" data-player-id="${player.id}">
@@ -581,11 +579,12 @@
             <strong>${escapeHtml(player.name)}</strong>
             <span>${escapeHtml(statusLabel)}</span>
           </header>
-          <p class="validation-answer ${isFinalRevealCategory ? "masked-validation-answer" : ""}">${answerMarkup}</p>
+          <p class="validation-answer ${hideHostAnswer ? "masked-validation-answer" : ""}">${answerMarkup}</p>
           <small>${escapeHtml(finisherPenaltyHint)}</small>
           ${isHost() ? `
             <div class="score-picker">
               <button type="button" class="score-button ${currentScore === -1 ? "picked" : ""}" data-score="-1">-1</button>
+              <button type="button" class="score-button ${currentScore === 0 ? "picked" : ""}" data-score="0">0</button>
               <button type="button" class="score-button ${currentScore === 1 ? "picked" : ""}" data-score="1">+1</button>
               <button type="button" class="score-button ${currentScore === 2 ? "picked" : ""}" data-score="2">+2</button>
             </div>
@@ -603,7 +602,7 @@
           </div>
           <div class="timer-chip">Manche ${round.roundNumber}</div>
         </div>
-        <p class="panel-copy">${isFinalRevealCategory ? "La derniere carte reste volontairement masquee jusqu'a l'annonce finale." : "Attribuez les points categorie par categorie. Les reponses proches ressortent tout de suite pour accelerer l'arbitrage."}</p>
+        <p class="panel-copy">${isFinalRevealCategory ? "Une reponse ne s'est pas affichee sur cette derniere carte, mais vous pouvez terminer la validation normalement." : "Attribuez les points categorie par categorie. Les reponses proches ressortent tout de suite pour accelerer l'arbitrage."}</p>
         <div class="validation-grid">${cardsMarkup}</div>
         <div class="action-row room-actions">
           ${isHost() ? '<button class="primary-button" type="button" id="save-category">Valider la categorie</button>' : '<div class="note-panel"><p>En attente de la validation de l\'hote.</p></div>'}
@@ -687,17 +686,26 @@
       <section class="room-grid">
         <article class="room-card final-room-card">
           <p class="eyebrow">Annonce</p>
-          <div class="surprise-stage ${state.finalRevealOpen ? "surprise-stage-open" : ""}">
-            <span class="reveal-label">Derniere carte</span>
-            <h2>${state.finalRevealOpen ? escapeHtml(data.finalRound.announcementTitle) : "Tout tenait dans un dernier mot en B..."}</h2>
-            <p class="panel-copy">${state.finalRevealOpen ? escapeHtml(data.finalRound.announcementCopy) : `Gardez le suspense encore une seconde, puis ouvrez la derniere carte pour decouvrir l'annonce finale.`}</p>
-            ${state.finalRevealOpen ? "" : '<button class="primary-button" type="button" id="reveal-announcement">Decouvrir l\'annonce</button>'}
+          <div class="announcement-stage">
+            <div class="announcement-visual" aria-hidden="true">
+              <div class="announcement-ring"></div>
+              <div class="announcement-core">
+                <span>B</span>
+              </div>
+              <div class="announcement-dot announcement-dot-left"></div>
+              <div class="announcement-dot announcement-dot-right"></div>
+            </div>
+            <div class="announcement-copy">
+              <span class="reveal-label">Derniere carte</span>
+              <h2>${escapeHtml(data.finalRound.announcementTitle)}</h2>
+              <p class="panel-copy">${escapeHtml(data.finalRound.announcementCopy)}</p>
+            </div>
           </div>
-          <div class="host-reveal-panel ${state.finalRevealOpen ? "visible-reveal" : ""}">
+          <div class="host-reveal-panel visible-reveal">
             <span class="reveal-label">${escapeHtml(categoryName)}</span>
             <strong>${escapeHtml(hostAnswer || data.finalRound.suggestedAnswer)}</strong>
           </div>
-          ${state.finalRevealOpen ? `<div class="final-answer-grid">${finalAnswersMarkup}</div>` : ""}
+          <div class="final-answer-grid">${finalAnswersMarkup}</div>
         </article>
         <article class="room-card summary-card">
           <p class="eyebrow">Classement</p>
@@ -705,14 +713,6 @@
         </article>
       </section>
     `;
-
-    const revealButton = root.querySelector("#reveal-announcement");
-    if (revealButton) {
-      revealButton.addEventListener("click", function handleReveal() {
-        state.finalRevealOpen = true;
-        renderFinished();
-      });
-    }
   }
 
   function render() {
