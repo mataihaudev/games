@@ -35,6 +35,78 @@ create table if not exists submissions (
 
 alter table submissions add column if not exists finished_at timestamptz;
 
+grant usage on schema public to anon, authenticated;
+grant select, insert, update, delete on table rooms to anon, authenticated;
+grant select, insert, update, delete on table players to anon, authenticated;
+grant select, insert, update, delete on table submissions to anon, authenticated;
+
+alter table rooms enable row level security;
+alter table players enable row level security;
+alter table submissions enable row level security;
+
+drop policy if exists "rooms_public_select" on rooms;
+create policy "rooms_public_select" on rooms
+for select to anon, authenticated
+using (true);
+
+drop policy if exists "rooms_public_insert" on rooms;
+create policy "rooms_public_insert" on rooms
+for insert to anon, authenticated
+with check (true);
+
+drop policy if exists "rooms_public_update" on rooms;
+create policy "rooms_public_update" on rooms
+for update to anon, authenticated
+using (true)
+with check (true);
+
+drop policy if exists "rooms_public_delete" on rooms;
+create policy "rooms_public_delete" on rooms
+for delete to anon, authenticated
+using (true);
+
+drop policy if exists "players_public_select" on players;
+create policy "players_public_select" on players
+for select to anon, authenticated
+using (true);
+
+drop policy if exists "players_public_insert" on players;
+create policy "players_public_insert" on players
+for insert to anon, authenticated
+with check (true);
+
+drop policy if exists "players_public_update" on players;
+create policy "players_public_update" on players
+for update to anon, authenticated
+using (true)
+with check (true);
+
+drop policy if exists "players_public_delete" on players;
+create policy "players_public_delete" on players
+for delete to anon, authenticated
+using (true);
+
+drop policy if exists "submissions_public_select" on submissions;
+create policy "submissions_public_select" on submissions
+for select to anon, authenticated
+using (true);
+
+drop policy if exists "submissions_public_insert" on submissions;
+create policy "submissions_public_insert" on submissions
+for insert to anon, authenticated
+with check (true);
+
+drop policy if exists "submissions_public_update" on submissions;
+create policy "submissions_public_update" on submissions
+for update to anon, authenticated
+using (true)
+with check (true);
+
+drop policy if exists "submissions_public_delete" on submissions;
+create policy "submissions_public_delete" on submissions
+for delete to anon, authenticated
+using (true);
+
 do $$
 begin
   alter publication supabase_realtime add table rooms;

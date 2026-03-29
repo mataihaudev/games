@@ -12,6 +12,7 @@
     roomId: null,
     playerId: null,
     playerName: "",
+    setupError: "",
     unsubscribe: null,
     countdownId: null,
     countdownRemaining: null,
@@ -72,6 +73,32 @@
     url.search = "";
     url.searchParams.set("room", state.roomId || "");
     return url.toString();
+  }
+
+  function friendlySetupError(error, intent) {
+    const message = error && error.message ? String(error.message) : "";
+    const normalized = message.toLowerCase();
+
+    if (intent === "join" && normalized.includes("room not found")) {
+      return "Aucun salon ne correspond a ce code.";
+    }
+
+    if (
+      normalized.includes("row-level security") ||
+      normalized.includes("permission denied") ||
+      normalized.includes("not allowed") ||
+      normalized.includes("violates row-level security")
+    ) {
+      return "Supabase refuse actuellement l'acces aux tables du jeu. Reexecute le schema SQL dans Supabase pour appliquer les autorisations du petit bac.";
+    }
+
+    if (normalized.includes("failed to fetch") || normalized.includes("network")) {
+      return "La connexion au service multijoueur a echoue. Verifie le deploiement Vercel et les variables SUPABASE_URL et SUPABASE_ANON_KEY.";
+    }
+
+    return intent === "join"
+      ? "Impossible de rejoindre ce salon pour le moment."
+      : "Impossible de creer un salon pour le moment.";
   }
 
   function roundAt(index) {
@@ -312,6 +339,7 @@
       <section class="room-card">
         <p class="eyebrow">Salon prive</p>
         <h2>Creer ou rejoindre un salon</h2>
+        ${state.setupError ? `<div class="note-panel" role="alert"><strong>Action impossible</strong><p>${escapeHtml(state.setupError)}</p></div>` : ""}
         <form id="room-form" class="room-form">
           <label class="field-block">
             <span>Pseudo</span>
@@ -342,16 +370,31 @@
       const roomId = String(formData.get("room") || "").trim().toUpperCase();
       const intent = submitter ? submitter.value : "create";
 
+      state.setupError = "";
+
       if (!name) {
+        state.setupError = "Ajoute un pseudo pour continuer.";
+        renderSetup();
         return;
       }
 
-      if (intent === "join" && roomId) {
-        await joinRoom(roomId, name);
+      if (intent === "join" && !roomId) {
+        state.setupError = "Renseigne le code du salon pour rejoindre une partie.";
+        renderSetup();
         return;
       }
 
-      await createRoom(name);
+      try {
+        if (intent === "join") {
+          await joinRoom(roomId, name);
+          return;
+        }
+
+        await createRoom(name);
+      } catch (error) {
+        state.setupError = friendlySetupError(error, intent);
+        renderSetup();
+      }
     });
   }
 
