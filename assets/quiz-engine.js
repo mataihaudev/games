@@ -179,13 +179,20 @@
     root.innerHTML = `
       <section class="result-panel final-panel">
         <p class="eyebrow">${escapeHtml(window.quizContent.result.eyebrow)}</p>
-        <div class="final-avatar-chip">
-          <span class="avatar-portrait large-portrait">${getAvatarFace(avatar.id)}</span>
-          <strong>${escapeHtml(avatar.name)}</strong>
+        <div class="announcement-stage quiz-announcement-stage">
+          <div class="announcement-visual" aria-hidden="true">
+            <img class="announcement-image" src="images/baby.jpg" alt="Illustration de quatre etapes d'un bebe">
+          </div>
+          <div class="announcement-copy">
+            <div class="final-avatar-chip">
+              <span class="avatar-portrait large-portrait">${getAvatarFace(avatar.id)}</span>
+              <strong>${escapeHtml(avatar.name)}</strong>
+            </div>
+            <p class="panel-copy">${escapeHtml(window.quizContent.result.lead)}</p>
+            <h1>${escapeHtml(revealText)}</h1>
+            <p class="result-highlight">${escapeHtml(window.quizContent.result.outro)}</p>
+          </div>
         </div>
-        <p class="panel-copy">${escapeHtml(window.quizContent.result.lead)}</p>
-        <h1>${escapeHtml(revealText)}</h1>
-        <p class="result-highlight">${escapeHtml(window.quizContent.result.outro)}</p>
         <div class="action-row result-actions">
           <a class="ghost-button as-link" href="index.html">Retour</a>
           <button type="button" class="primary-button" id="restart-button">Rejouer</button>

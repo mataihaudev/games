@@ -193,6 +193,39 @@
     timerChip.classList.remove("timer-live");
   }
 
+  function isRoundInputLocked(room) {
+    const activeRoom = room || state.room;
+    if (!activeRoom || activeRoom.stage !== "playing") {
+      return false;
+    }
+
+    const round = activeRoom.rounds ? activeRoom.rounds[activeRoom.currentRoundIndex || 0] : null;
+    if (!round) {
+      return false;
+    }
+
+    return Boolean(activeRoom.timer && activeRoom.timer.endsAt && activeRoom.timer.endsAt <= Date.now());
+  }
+
+  function updateAnswerLockState() {
+    const locked = isRoundInputLocked();
+    root.querySelectorAll("[data-category-index]").forEach(function updateInput(input) {
+      input.disabled = locked;
+    });
+
+    const finishButton = root.querySelector("#finish-button");
+    if (finishButton) {
+      finishButton.disabled = locked;
+    }
+
+    if (locked) {
+      const activeElement = document.activeElement;
+      if (activeElement && root.contains(activeElement) && activeElement.hasAttribute("data-category-index")) {
+        activeElement.blur();
+      }
+    }
+  }
+
   function isEditingAnswer() {
     const activeElement = document.activeElement;
     return Boolean(activeElement && root.contains(activeElement) && activeElement.hasAttribute("data-category-index"));
@@ -203,6 +236,7 @@
     if (!state.room || !state.room.timer || !state.room.timer.endsAt) {
       state.countdownRemaining = null;
       updateTimerChip();
+      updateAnswerLockState();
       return;
     }
 
@@ -213,6 +247,7 @@
         stopLocalCountdown();
       }
       updateTimerChip();
+      updateAnswerLockState();
     };
 
     tick();
@@ -291,6 +326,11 @@
   }
 
   async function saveAnswer(roundNumber, categoryIndex, value) {
+    if (isRoundInputLocked()) {
+      updateAnswerLockState();
+      return;
+    }
+
     await backend.updateRoom(state.roomId, function update(room) {
       const roundKey = roomSubmissionKey(roundNumber);
       room.submissions[roundKey] = room.submissions[roundKey] || {};
@@ -505,12 +545,13 @@
     const round = currentRound();
     const roundAnswers = playerAnswers(round.roundNumber, state.playerId);
     const finisher = playerForId(state.room.finisherId);
+    const inputsLocked = isRoundInputLocked();
     const categoriesMarkup = round.categories.map(function mapCategory(category, index) {
       const value = escapeHtml(roundAnswers.answers[String(index)] || "");
       return `
         <label class="field-block category-field">
           <span>${index + 1}. ${escapeHtml(category)}</span>
-          <input class="text-input" data-category-index="${index}" maxlength="40" value="${value}" placeholder="${escapeHtml(round.letter)}...">
+          <input class="text-input" data-category-index="${index}" maxlength="40" value="${value}" placeholder="${escapeHtml(round.letter)}..." ${inputsLocked ? "disabled" : ""}>
         </label>
       `;
     }).join("");
@@ -529,10 +570,10 @@
           </div>
           <form id="answers-form" class="category-grid">${categoriesMarkup}</form>
           <div class="action-row room-actions">
-            <button class="ghost-button" type="button" id="finish-button">Je termine</button>
+            <button class="ghost-button" type="button" id="finish-button" ${inputsLocked ? "disabled" : ""}>Je termine</button>
             ${isHost() ? '<button class="primary-button" type="button" id="force-validation">Ouvrir la validation</button>' : ''}
           </div>
-          ${finisher ? `<p class="inline-fact show-fact">${escapeHtml(finisher.name)} a termine. Le chrono final est lance pour tout le salon.</p>` : ""}
+          ${inputsLocked && state.room.timer ? '<p class="inline-fact show-fact">Le temps est ecoule. Les reponses sont maintenant verrouillees.</p>' : finisher ? `<p class="inline-fact show-fact">${escapeHtml(finisher.name)} a termine. Le chrono final est lance pour tout le salon.</p>` : ""}
         </article>
       </section>
     `;
@@ -549,6 +590,8 @@
     if (forceValidationButton) {
       forceValidationButton.addEventListener("click", forceValidation);
     }
+
+    updateAnswerLockState();
   }
 
   function renderValidation() {
@@ -559,19 +602,18 @@
     const existingScores = scoreEntries(round.roundNumber, categoryIndex);
     const isFinalRevealCategory = round.roundNumber === state.room.rounds.length && categoryIndex === round.categories.length - 1;
 
-    const cardsMarkup = state.room.players.map(function mapPlayer(player) {
+    const visiblePlayers = state.room.players.filter(function filterPlayer(player) {
+      return !(isFinalRevealCategory && player.isHost);
+    });
+
+    const cardsMarkup = visiblePlayers.map(function mapPlayer(player) {
       const answer = duplicates.values[player.id] || "";
       const normalized = answer.trim().toLowerCase();
-      const hideHostAnswer = isFinalRevealCategory && player.isHost;
-      const duplicateClass = hideHostAnswer
-        ? "secret-answer"
-        : normalized && duplicates.duplicates.has(normalized) ? "duplicate-answer" : "unique-answer";
+      const duplicateClass = normalized && duplicates.duplicates.has(normalized) ? "duplicate-answer" : "unique-answer";
       const finisherPenaltyHint = state.room.finisherId === player.id ? "A coupe le chrono" : "";
       const currentScore = Number(existingScores[player.id] || 0);
-      const statusLabel = hideHostAnswer
-        ? "Reponse indisponible"
-        : duplicateClass === "duplicate-answer" ? "Reponse partagee" : "Reponse originale";
-      const answerMarkup = hideHostAnswer ? "Synchronisation en attente" : escapeHtml(answer || "-");
+      const statusLabel = duplicateClass === "duplicate-answer" ? "Reponse partagee" : "Reponse originale";
+      const answerMarkup = escapeHtml(answer || "-");
 
       return `
         <article class="validation-card ${duplicateClass}" data-player-id="${player.id}">
@@ -579,7 +621,7 @@
             <strong>${escapeHtml(player.name)}</strong>
             <span>${escapeHtml(statusLabel)}</span>
           </header>
-          <p class="validation-answer ${hideHostAnswer ? "masked-validation-answer" : ""}">${answerMarkup}</p>
+          <p class="validation-answer">${answerMarkup}</p>
           <small>${escapeHtml(finisherPenaltyHint)}</small>
           ${isHost() ? `
             <div class="score-picker">
@@ -602,7 +644,7 @@
           </div>
           <div class="timer-chip">Manche ${round.roundNumber}</div>
         </div>
-        <p class="panel-copy">${isFinalRevealCategory ? "Une reponse ne s'est pas affichee sur cette derniere carte, mais vous pouvez terminer la validation normalement." : "Attribuez les points categorie par categorie. Les reponses proches ressortent tout de suite pour accelerer l'arbitrage."}</p>
+        <p class="panel-copy">${isFinalRevealCategory ? "Une carte manque sur cette derniere categorie, mais vous pouvez terminer la validation normalement." : "Attribuez les points categorie par categorie. Les reponses proches ressortent tout de suite pour accelerer l'arbitrage."}</p>
         <div class="validation-grid">${cardsMarkup}</div>
         <div class="action-row room-actions">
           ${isHost() ? '<button class="primary-button" type="button" id="save-category">Valider la categorie</button>' : '<div class="note-panel"><p>En attente de la validation de l\'hote.</p></div>'}
@@ -688,17 +730,13 @@
           <p class="eyebrow">Annonce</p>
           <div class="announcement-stage">
             <div class="announcement-visual" aria-hidden="true">
-              <div class="announcement-ring"></div>
-              <div class="announcement-core">
-                <span>B</span>
-              </div>
-              <div class="announcement-dot announcement-dot-left"></div>
-              <div class="announcement-dot announcement-dot-right"></div>
+              <img class="announcement-image" src="images/baby.jpg" alt="Illustration de quatre etapes d'un bebe">
             </div>
             <div class="announcement-copy">
-              <span class="reveal-label">Derniere carte</span>
+              <span class="reveal-label">Annonce finale</span>
               <h2>${escapeHtml(data.finalRound.announcementTitle)}</h2>
               <p class="panel-copy">${escapeHtml(data.finalRound.announcementCopy)}</p>
+              <p class="announcement-note">Une nouvelle aventure commence dans la famille.</p>
             </div>
           </div>
           <div class="host-reveal-panel visible-reveal">
