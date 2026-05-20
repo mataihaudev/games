@@ -37,6 +37,9 @@
       window.sessionStorage.setItem("scatter-room-id", state.roomId || "");
       window.sessionStorage.setItem("scatter-player-id", state.playerId || "");
       window.sessionStorage.setItem("scatter-player-name", state.playerName || "");
+      window.localStorage.setItem("scatter-room-id", state.roomId || "");
+      window.localStorage.setItem("scatter-player-id", state.playerId || "");
+      window.localStorage.setItem("scatter-player-name", state.playerName || "");
     } catch (error) {
       // Ignore persistence issues.
     }
@@ -46,6 +49,8 @@
     try {
       window.sessionStorage.removeItem("scatter-room-id");
       window.sessionStorage.removeItem("scatter-player-id");
+      window.localStorage.removeItem("scatter-room-id");
+      window.localStorage.removeItem("scatter-player-id");
     } catch (error) {
       // Ignore persistence issues.
     }
@@ -62,13 +67,13 @@
         clearStoredRoomIdentity();
         state.roomId = "";
         state.playerId = "";
-        state.playerName = window.sessionStorage.getItem("scatter-player-name") || "";
+        state.playerName = window.sessionStorage.getItem("scatter-player-name") || window.localStorage.getItem("scatter-player-name") || "";
         return;
       }
 
       state.roomId = queryRoomId;
-      state.playerId = queryPlayerId || window.sessionStorage.getItem("scatter-player-id") || "";
-      state.playerName = queryPlayerName || window.sessionStorage.getItem("scatter-player-name") || "";
+      state.playerId = queryPlayerId || window.sessionStorage.getItem("scatter-player-id") || window.localStorage.getItem("scatter-player-id") || "";
+      state.playerName = queryPlayerName || window.sessionStorage.getItem("scatter-player-name") || window.localStorage.getItem("scatter-player-name") || "";
     } catch (error) {
       state.roomId = queryRoomId;
       state.playerId = queryPlayerId;
@@ -144,16 +149,22 @@
     return roundEntries[String(categoryIndex)] || {};
   }
 
-  function duplicateInfo(roundNumber, categoryIndex) {
+  function duplicateInfo(roundNumber, categoryIndex, options) {
     const round = roundAt(roundNumber - 1);
     if (!round) {
       return { values: {}, duplicates: new Set() };
     }
 
+    const excludedPlayerIds = new Set(((options && options.excludedPlayerIds) || []).filter(Boolean));
+
     const answersByPlayer = {};
     const normalizedCounts = {};
 
     state.room.players.forEach((player) => {
+      if (excludedPlayerIds.has(player.id)) {
+        return;
+      }
+
       const entry = playerAnswers(roundNumber, player.id);
       const answer = (entry.answers[String(categoryIndex)] || "").trim();
       answersByPlayer[player.id] = answer;
@@ -598,9 +609,11 @@
     const round = currentRound();
     const categoryIndex = state.room.currentValidationCategoryIndex;
     const categoryName = round.categories[categoryIndex];
-    const duplicates = duplicateInfo(round.roundNumber, categoryIndex);
     const existingScores = scoreEntries(round.roundNumber, categoryIndex);
     const isFinalRevealCategory = round.roundNumber === state.room.rounds.length && categoryIndex === round.categories.length - 1;
+    const duplicates = duplicateInfo(round.roundNumber, categoryIndex, {
+      excludedPlayerIds: isFinalRevealCategory ? [state.room.hostId] : []
+    });
 
     const visiblePlayers = state.room.players.filter(function filterPlayer(player) {
       return !(isFinalRevealCategory && player.isHost);
@@ -703,13 +716,18 @@
   }
 
   function renderFinished() {
-    const round = currentRound();
-    const categoryName = round ? round.categories[9] : data.finalRound.finalCategory;
+    const lastRoundIndex = Math.max(0, (state.room.rounds || []).length - 1);
+    const finalRound = roundAt(lastRoundIndex);
+    const finalCategoryIndex = finalRound && finalRound.categories ? Math.max(0, finalRound.categories.length - 1) : 0;
+    const finalRoundNumber = finalRound ? finalRound.roundNumber : (state.room.rounds || []).length;
+    const categoryName = finalRound ? finalRound.categories[finalCategoryIndex] : data.finalRound.finalCategory;
     const host = playerForId(state.room.hostId);
-    const hostAnswer = host ? (playerAnswers(3, host.id).answers["9"] || data.finalRound.suggestedAnswer) : data.finalRound.suggestedAnswer;
+    const hostAnswer = host
+      ? (playerAnswers(finalRoundNumber, host.id).answers[String(finalCategoryIndex)] || data.finalRound.suggestedAnswer)
+      : data.finalRound.suggestedAnswer;
     const finalAnswersMarkup = state.room.players
       .map(function mapFinalAnswer(player) {
-        const answer = playerAnswers(3, player.id).answers["9"] || "-";
+        const answer = playerAnswers(finalRoundNumber, player.id).answers[String(finalCategoryIndex)] || "-";
         return `
           <article class="final-answer-card ${player.isHost ? "host-answer-card" : ""}">
             <span>${escapeHtml(player.name)}</span>

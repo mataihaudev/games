@@ -17,6 +17,10 @@
     return JSON.parse(JSON.stringify(value));
   }
 
+  function normalizeName(value) {
+    return String(value || "").trim().toLowerCase();
+  }
+
   function toIsoString(value) {
     return value ? new Date(value).toISOString() : null;
   }
@@ -105,6 +109,13 @@
       async joinRoom(roomId, playerName) {
         const state = readState();
         const room = ensureRoom(state, roomId);
+        const normalizedName = normalizeName(playerName);
+        const existingPlayer = (room.players || []).find((player) => normalizeName(player.name) === normalizedName);
+
+        if (existingPlayer) {
+          return { roomId, playerId: existingPlayer.id, room: clone(room) };
+        }
+
         const playerId = randomId(8);
         room.players.push({
           id: playerId,
@@ -431,6 +442,14 @@
         return { roomId, playerId: hostId, room: await getRoom(roomId) };
       },
       async joinRoom(roomId, playerName) {
+        const room = await getRoom(roomId);
+        const normalizedName = normalizeName(playerName);
+        const existingPlayer = (room.players || []).find((player) => normalizeName(player.name) === normalizedName);
+
+        if (existingPlayer) {
+          return { roomId, playerId: existingPlayer.id, room };
+        }
+
         const playerId = randomId(8);
 
         await runQuery(

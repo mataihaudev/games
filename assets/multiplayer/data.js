@@ -1,55 +1,65 @@
 (function () {
   const categoriesPool = [
-    "Ville deja visitee",
+    "Ville déjà visitée",
     "Chose qui sent fort",
-    "Nom d'un jeu video",
-    "Mot qu'on entend au marche",
+    "Nom d'un jeu vidéo",
     "Objet qu'on perd souvent",
     "Plat qui se mange froid",
-    "Truc qu'on emporte en voyage",
-    "Excuse peu credible",
-    "Lieu ou on enleve ses chaussures",
+    "Objet qu'on emporte en voyage",
+    "Excuse peu crédible",
+    "Lieu où on enlève ses chaussures",
     "Nom d'une boisson chaude",
     "Quelque chose de fragile",
-    "Mot qu'on dit en retard",
     "Animal qui impressionne",
-    "Chose qu'on colle sur un frigo",
     "Objet qu'on recharge",
-    "Mot qu'on voit a l'aeroport",
-    "Metier qui finit tard",
-    "Truc qu'on oublie en partant",
-    "Nom d'une ile",
-    "Chose qu'on offre a quelqu'un",
-    "Mot relie a la pluie",
+    "Métier qui finit tard",
+    "Objet qu'on oublie en partant",
+    "Nom d'une île",
+    "Chose qu'on offre à quelqu'un",
     "Objet qui roule",
     "Chose qui fait du bruit la nuit",
     "Nom d'un film culte",
-    "Endroit ou on attend",
-    "Mot qu'on crie dans un stade",
+    "Endroit où on attend",
     "Chose qu'on garde dans un tiroir",
     "Truc qui pique",
     "Nom d'un dessert",
     "Quelque chose de minuscule",
-    "Mot qui rassure",
     "Nom d'un artiste",
-    "Truc qu'on trouve dans une salle de bain",
+    "Objet qu'on trouve dans une salle de bain",
     "Raison de sortir tard",
-    "Mot qu'on lit sur une carte",
-    "Objet qu'on prete rarement",
+    "Objet qu'on prête rarement",
     "Nom d'une appli",
     "Chose qui brille",
-    "Endroit ou il fait humide",
-    "Mot relie a un souvenir",
+    "Endroit où il fait humide",
     "Quelque chose qu'on collectionne",
-    "Mot qu'on associe a une fete",
     "Objet qu'on pose sur une table",
-    "Nom d'un pokemon",
+    "Nom d'un Pokémon",
     "Quelque chose qui fait rire",
     "Truc qui prend de la place",
     "Nom d'une capitale",
     "Chose qu'on garde pour plus tard",
-    "Mot qu'on dit en entrant",
-    "Quelque chose qu'on entend en voiture"
+    "Quelque chose qu'on entend en voiture",
+    // Nouvelles catégories
+    "Nom d'un sportif",
+    "Nom d'une ville française",
+    "Nom d'un animal domestique",
+    "Nom d'une fleur",
+    "Nom d'un instrument de musique",
+    "Nom d'un pays",
+    "Nom d'une célébrité",
+    "Nom d'un personnage de dessin animé",
+    "Nom d'une marque",
+    "Nom d'un plat cuisiné",
+    "Nom d'un métier",
+    "Nom d'un objet électronique",
+    "Nom d'une série télé",
+    "Nom d'un sport",
+    "Nom d'un écrivain",
+    "Nom d'une chanson connue",
+    "Nom d'un acteur ou actrice",
+    "Nom d'une couleur",
+    "Nom d'un monument",
+    "Nom d'une rivière ou d'un lac"
   ];
 
   const alphabet = ["A", "B", "C", "D", "E", "F", "G", "H", "J", "K", "L", "M", "N", "P", "R", "S", "T", "V"];
@@ -90,12 +100,12 @@
 
       const categories = sample(
         categoriesPool,
-        10,
+        7,
         isFinalRound ? [finalRound.finalCategory] : []
       );
 
       if (isFinalRound) {
-        categories[9] = finalRound.finalCategory;
+        categories[6] = finalRound.finalCategory;
       }
 
       rounds.push({
