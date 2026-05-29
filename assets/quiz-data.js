@@ -51,13 +51,6 @@
     },
     {
       id: 8,
-      prompt: "En reo tahiti, le signe apostrophe se nomme ?",
-      choices: ["Okina", "Paepae", "Umete", "Tahua"],
-      answer: 0,
-      fact: "L'okina marque un coup de glotte dans plusieurs langues polynesiennes."
-    },
-    {
-      id: 9,
       prompt: "En novembre, aux iles du Vent, le temps devient plus souvent ?",
       choices: ["Chaud et humide", "Frais et tres sec", "Brumeux et froid", "Stable sans pluie"],
       answer: 0,
@@ -69,11 +62,13 @@
     { id: "dad", name: "Dad", label: "Player A", role: "grand-pere" },
     { id: "mom", name: "Mom", label: "Player B", role: "grand-mere" },
     { id: "siblings", name: "Siblings", label: "Player C", role: "tata-tonton" },
-    { id: "friends", name: "Friends", label: "Player D", role: "tata-tonton" }
+    { id: "friends", name: "Friends", label: "Player D", role: "tata-tonton" },
+    { id: "mygrandpa", name: "Mon grand-pere", label: "Player E", role: "arriere-grand-pere" }
   ];
 
   const revealByRole = {
     "grand-pere": "Felicitations ! Tu vas etre un merveilleux grand-pere.",
+    "arriere-grand-pere": "Felicitations ! Tu vas etre un incroyable arriere-grand-pere.",
     "grand-mere": "Felicitations ! Tu vas etre une formidable grand-mere.",
     "tata-tonton": "Felicitations ! Tu vas etre un tonton ou tata en or."
   };

@@ -29,10 +29,14 @@
 
   function getAvatarFace(seed) {
     const faces = {
-      dad: { skin: "#f2c7a5", hair: "#2c2b30", shirt: "#197278" },
-      mom: { skin: "#f4cfb1", hair: "#5f4339", shirt: "#ef6b58" },
+      grandpa: { skin: "#f2c7a5", hair: "#2c2b30", shirt: "#197278" },
+      grandma: { skin: "#f4cfb1", hair: "#5f4339", shirt: "#ef6b58" },
+      greatgrandpa: { skin: "#e7bb96", hair: "#3f3a38", shirt: "#4a7c9b" },
+      mygrandpa: { skin: "#deb38f", hair: "#4b4644", shirt: "#3f6f8a" },
       siblings: { skin: "#f0c39d", hair: "#3c5b6f", shirt: "#ffc857" },
-      friends: { skin: "#eac09f", hair: "#263238", shirt: "#7a9e7e" }
+      friends: { skin: "#eac09f", hair: "#263238", shirt: "#7a9e7e" },
+      dad: { skin: "#f2c7a5", hair: "#2c2b30", shirt: "#197278" },
+      mom: { skin: "#f4cfb1", hair: "#5f4339", shirt: "#ef6b58" }
     };
     const palette = faces[seed] || faces.friends;
 
