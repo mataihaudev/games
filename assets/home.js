@@ -8,6 +8,16 @@
 
   let selectedAvatarId = null;
 
+  function updateStartLinkHref() {
+    const targetUrl = new URL(startLink.getAttribute("href"), window.location.href);
+    if (selectedAvatarId) {
+      targetUrl.searchParams.set("avatar", selectedAvatarId);
+    } else {
+      targetUrl.searchParams.delete("avatar");
+    }
+    startLink.href = targetUrl.toString();
+  }
+
   function getInitials(name) {
     return name
       .split(" ")
@@ -72,6 +82,7 @@
         }
         startLink.classList.remove("disabled-link");
         startLink.setAttribute("aria-disabled", "false");
+        updateStartLinkHref();
         render();
       });
     });
@@ -82,6 +93,8 @@
       event.preventDefault();
     }
   });
+
+  updateStartLinkHref();
 
   render();
 })();

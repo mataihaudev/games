@@ -213,8 +213,10 @@
   }
 
   try {
+    const queryAvatarId = new URL(window.location.href).searchParams.get("avatar");
     const storedAvatarId = window.sessionStorage.getItem("tefenua-avatar");
-    state.selectedAvatar = window.quizContent.avatars.find((avatar) => avatar.id === storedAvatarId) || window.quizContent.avatars[0];
+    const selectedAvatarId = queryAvatarId || storedAvatarId;
+    state.selectedAvatar = window.quizContent.avatars.find((avatar) => avatar.id === selectedAvatarId) || window.quizContent.avatars[0];
   } catch (error) {
     state.selectedAvatar = window.quizContent.avatars[0];
   }
