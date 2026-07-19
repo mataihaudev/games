@@ -234,6 +234,13 @@ body::before {
     linear-gradient(180deg, rgba(244, 255, 253, 0.96), rgba(228, 248, 245, 0.9));
 }
 
+.reveal-panel {
+  background:
+    radial-gradient(circle at top right, rgba(184, 138, 222, 0.22), transparent 34%),
+    radial-gradient(circle at bottom left, rgba(103, 184, 121, 0.2), transparent 30%),
+    linear-gradient(180deg, rgba(255, 250, 255, 0.96), rgba(244, 238, 250, 0.9));
+}
+
 .room-points {
   display: flex;
   flex-wrap: wrap;
@@ -782,6 +789,185 @@ body::before {
   margin-top: 16px;
 }
 
+.reveal-game-layout {
+  display: grid;
+  gap: 14px;
+}
+
+.reveal-sidebar {
+  display: grid;
+  gap: 14px;
+  align-content: start;
+}
+
+.reveal-heading {
+  display: flex;
+  justify-content: space-between;
+  gap: 14px;
+  align-items: start;
+}
+
+.turn-chip {
+  display: inline-grid;
+  place-items: center;
+  white-space: nowrap;
+  min-height: 42px;
+  padding: 0 14px;
+  border-radius: 999px;
+  background: rgba(18, 50, 74, 0.08);
+  font-weight: 800;
+}
+
+.reveal-board {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: clamp(6px, 1.6vw, 12px);
+  max-width: 620px;
+  margin: 22px auto 0;
+}
+
+.reveal-board-3 {
+  max-width: 390px;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.reveal-tile {
+  aspect-ratio: 1;
+  min-width: 0;
+  border: 0;
+  border-radius: clamp(10px, 2vw, 18px);
+  background: linear-gradient(145deg, #fffdf8, #e7f3ef);
+  color: var(--lagoon-deep);
+  box-shadow: 0 8px 18px rgba(18, 50, 74, 0.1);
+  font: 800 clamp(1.1rem, 4vw, 2rem) "Baloo 2", cursive;
+  cursor: pointer;
+  transition: transform 160ms ease, box-shadow 160ms ease;
+}
+
+.reveal-tile:not(:disabled):hover,
+.reveal-tile:not(:disabled):focus-visible {
+  transform: translateY(-3px) scale(1.03);
+  box-shadow: 0 14px 24px rgba(18, 50, 74, 0.16);
+}
+
+.reveal-tile:disabled { cursor: default; }
+.reveal-tile.is-shark { background: linear-gradient(145deg, #8ed28b, #3e9968); color: white; }
+.reveal-tile.is-fish { background: linear-gradient(145deg, #d3aeeb, #8e62b0); color: white; }
+.reveal-tile.is-pink { background: linear-gradient(145deg, #ffb5cf, #ed6e9f); color: white; }
+.reveal-tile.is-blue { background: linear-gradient(145deg, #91d5ff, #438bd8); color: white; }
+
+.team-choice-fieldset,
+.board-mode-picker {
+  margin: 0;
+  padding: 0;
+  border: 0;
+}
+
+.team-choice-fieldset legend,
+.board-mode-picker legend {
+  margin-bottom: 10px;
+  font-weight: 800;
+  color: var(--lagoon-deep);
+}
+
+.team-choice-fieldset { display: grid; gap: 10px; }
+
+.board-mode-picker { display: grid; gap: 10px; }
+
+.board-mode-option {
+  display: flex;
+  align-items: start;
+  gap: 10px;
+  padding: 14px;
+  border: 1px solid rgba(18, 50, 74, 0.12);
+  border-radius: 16px;
+  background: rgba(255, 255, 255, 0.72);
+  cursor: pointer;
+}
+
+.board-mode-option span { display: grid; gap: 3px; }
+.board-mode-option small { color: var(--text-soft); line-height: 1.4; }
+.board-mode-option:has(input:checked) { border-color: rgba(239, 107, 88, 0.6); background: rgba(255, 236, 230, 0.8); }
+
+.team-choice {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  column-gap: 10px;
+  align-items: center;
+  padding: 14px;
+  border-radius: 16px;
+  border: 1px solid rgba(18, 50, 74, 0.1);
+  cursor: pointer;
+}
+
+.team-choice span { font-weight: 800; }
+.team-choice small { grid-column: 2; color: var(--text-soft); }
+.shark-choice { background: rgba(92, 172, 105, 0.13); }
+.fish-choice { background: rgba(167, 112, 200, 0.13); }
+
+.reveal-player-list {
+  display: grid;
+  gap: 8px;
+  list-style: none;
+  padding: 0;
+  margin: 0;
+}
+
+.reveal-player {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 12px;
+  border-radius: 14px;
+  background: rgba(18, 50, 74, 0.05);
+}
+
+.reveal-player > span { display: grid; gap: 2px; }
+.reveal-player small { color: var(--text-soft); }
+.reveal-player.team-shark { border-left: 4px solid #4ca367; }
+.reveal-player.team-fish { border-left: 4px solid #9b68be; }
+.presence-dot { font-size: 0.72rem; font-style: normal; font-weight: 800; }
+.presence-dot.online { color: #277e4d; }
+.presence-dot.offline { color: #926d72; }
+.presence-help { margin: 12px 0 0; color: var(--text-soft); font-size: 0.82rem; line-height: 1.45; }
+
+.copy-reveal-link { width: 100%; margin-top: 12px; }
+.share-actions { display: grid; gap: 10px; margin-top: 12px; }
+.share-actions .copy-reveal-link { margin-top: 0; }
+.host-controls { display: grid; gap: 14px; }
+.host-team-actions { display: grid; gap: 10px; }
+.team-action { min-height: 52px; border: 0; border-radius: 16px; color: white; font: inherit; font-weight: 800; cursor: pointer; }
+.team-action:disabled { opacity: 0.45; cursor: not-allowed; }
+.shark-action { background: linear-gradient(135deg, #4ca367, #80c66e); }
+.fish-action { background: linear-gradient(135deg, #8d61b1, #bd88d7); }
+.reveal-pink-note {
+  display: grid;
+  gap: 4px;
+  margin: 0;
+  padding: 14px;
+  border-radius: 16px;
+  background: linear-gradient(135deg, rgba(255, 181, 207, 0.4), rgba(255, 255, 255, 0.7));
+}
+
+.reveal-pink-note strong { color: #b44d78; }
+.reveal-pink-note span { color: var(--text-soft); line-height: 1.4; }
+
+.final-reveal {
+  display: grid;
+  gap: 2px;
+  margin-top: 20px;
+  padding: 20px;
+  border-radius: 20px;
+  color: white;
+  text-align: center;
+}
+
+.final-reveal span { font-size: 0.8rem; font-weight: 800; letter-spacing: 0.14em; text-transform: uppercase; }
+.final-reveal strong { font: 700 clamp(2rem, 7vw, 3.5rem) "Baloo 2", cursive; line-height: 1; }
+.final-reveal.pink { background: linear-gradient(135deg, #f17ca8, #ffb3ce); }
+.final-reveal.blue { background: linear-gradient(135deg, #438bd8, #91d5ff); }
+
 .player-list {
   display: grid;
   gap: 10px;
@@ -1104,6 +1290,10 @@ body::before {
 
   .room-grid {
     grid-template-columns: minmax(0, 1.7fr) minmax(300px, 0.9fr);
+  }
+
+  .reveal-game-layout {
+    grid-template-columns: minmax(0, 1.45fr) minmax(290px, 0.8fr);
   }
 
   .validation-grid {
